@@ -1,0 +1,126 @@
+{
+  "materials": {
+    "Steel": {
+      "co2_per_kg": 1.85,
+      "unit": "kg CO2e per kg",
+      "description": "Carbon steel production"
+    },
+    "Aluminum": {
+      "co2_per_kg": 8.24,
+      "unit": "kg CO2e per kg",
+      "description": "Primary aluminum production"
+    },
+    "Plastic": {
+      "co2_per_kg": 6.0,
+      "unit": "kg CO2e per kg",
+      "description": "Average plastic polymers"
+    },
+    "Cotton": {
+      "co2_per_kg": 5.3,
+      "unit": "kg CO2e per kg",
+      "description": "Cotton fiber production"
+    },
+    "Wood": {
+      "co2_per_kg": 0.72,
+      "unit": "kg CO2e per kg",
+      "description": "Processed lumber"
+    },
+    "Glass": {
+      "co2_per_kg": 0.85,
+      "unit": "kg CO2e per kg",
+      "description": "Glass container production"
+    },
+    "Rubber": {
+      "co2_per_kg": 3.2,
+      "unit": "kg CO2e per kg",
+      "description": "Synthetic rubber"
+    },
+    "Paper": {
+      "co2_per_kg": 1.32,
+      "unit": "kg CO2e per kg",
+      "description": "Paper and paperboard"
+    },
+    "Leather": {
+      "co2_per_kg": 17.0,
+      "unit": "kg CO2e per kg",
+      "description": "Leather tanning process"
+    },
+    "Copper": {
+      "co2_per_kg": 2.6,
+      "unit": "kg CO2e per kg",
+      "description": "Copper production"
+    },
+    "Ceramic": {
+      "co2_per_kg": 0.74,
+      "unit": "kg CO2e per kg",
+      "description": "Ceramic products"
+    },
+    "Nylon": {
+      "co2_per_kg": 7.6,
+      "unit": "kg CO2e per kg",
+      "description": "Nylon polymer production"
+    },
+    "Cardboard": {
+      "co2_per_kg": 0.95,
+      "unit": "kg CO2e per kg",
+      "description": "Corrugated cardboard"
+    },
+    "Stainless Steel": {
+      "co2_per_kg": 2.8,
+      "unit": "kg CO2e per kg",
+      "description": "Stainless steel production"
+    },
+    "Polyester": {
+      "co2_per_kg": 5.5,
+      "unit": "kg CO2e per kg",
+      "description": "Polyester fiber production"
+    },
+    "Concrete": {
+      "co2_per_kg": 0.11,
+      "unit": "kg CO2e per kg",
+      "description": "Concrete production"
+    },
+    "PVC": {
+      "co2_per_kg": 2.4,
+      "unit": "kg CO2e per kg",
+      "description": "PVC plastic production"
+    },
+    "Titanium": {
+      "co2_per_kg": 12.5,
+      "unit": "kg CO2e per kg",
+      "description": "Titanium metal production"
+    },
+    "Zinc": {
+      "co2_per_kg": 3.5,
+      "unit": "kg CO2e per kg",
+      "description": "Zinc production"
+    },
+    "Bronze": {
+      "co2_per_kg": 2.9,
+      "unit": "kg CO2e per kg",
+      "description": "Bronze alloy production"
+    }
+  },
+  "transportation": {
+    "Truck": {
+      "co2_per_km_per_kg": 0.00012,
+      "unit": "kg CO2e per km per kg",
+      "description": "Road freight transport"
+    },
+    "Ship": {
+      "co2_per_km_per_kg": 0.00001,
+      "unit": "kg CO2e per km per kg",
+      "description": "Sea freight transport"
+    },
+    "Air": {
+      "co2_per_km_per_kg": 0.0005,
+      "unit": "kg CO2e per km per kg",
+      "description": "Air freight transport"
+    },
+    "Rail": {
+      "co2_per_km_per_kg": 0.00003,
+      "unit": "kg CO2e per km per kg",
+      "description": "Rail freight transport"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+Product Name,Material Type,Weight (kg),Quantity,Supplier Location,Destination,Transportation Mode
+Laptop Case,Plastic,0.5,500,Shenzhen,Mumbai,Ship
+Steel Frame,Steel,15,200,Pittsburgh,Delhi,Ship
+Cotton T-Shirt,Cotton,0.2,1000,Dhaka,Faridabad,Air
+Aluminum Bottle,Aluminum,0.3,800,Shanghai,Bangalore,Ship
+Wooden Chair,Wood,8,150,Jakarta,Mumbai,Ship
+Glass Bottles,Glass,0.6,2000,Istanbul,Delhi,Truck
+Rubber Tires,Rubber,5,300,Bangkok,Chennai,Ship
+Paper Packaging,Paper,0.1,5000,Helsinki,Faridabad,Air
+Leather Shoes,Leather,0.8,600,Milan,Mumbai,Air
+Copper Wire,Copper,2,400,Santiago,Bangalore,Ship
+Ceramic Plates,Ceramic,1.2,1000,Guangzhou,Delhi,Ship
+Nylon Fabric,Nylon,0.3,1500,Taipei,Mumbai,Ship
+Cardboard Boxes,Cardboard,0.5,3000,Berlin,Faridabad,Truck
+Stainless Steel Utensils,Stainless Steel,0.4,2000,Seoul,Chennai,Ship
+Polyester Fabric,Polyester,0.25,2500,Bangkok,Mumbai,Air
