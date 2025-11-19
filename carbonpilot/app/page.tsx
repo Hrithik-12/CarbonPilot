@@ -36,9 +36,57 @@ type ApiResponse =
   | { ok: false; error: string };
 
 const DEFAULT_FORM: FormState = {
-  scenario: '',
-  dataSnapshot: '',
-  goal: '',
+  scenario: `The recent product carbon footprint analysis reveals a critical need for focused sustainability intervention, particularly given the Steel Frame component accounts for over two-thirds ($68.4\%$) of the total calculated emissions. While this data successfully pinpoints high-impact material types like Steel, the failure to process an item due to the absence of 'Vibranium' in the database underscores a major operational gap. Immediate priority must be placed on both sourcing lower-carbon alternatives for the dominant steel material and ensuring comprehensive emission factor coverage for all materials used, thereby guaranteeing the integrity and completeness of the final environmental inventory.
+`,
+  dataSnapshot: `{
+  "summary": {
+    "totalProducts": 4,
+    "successfulCalculations": 3,
+    "failedCalculations": 1,
+    "totalEmissions": 8110,
+    "totalWeight": 3450,
+    "averageEmissionsPerProduct": 2703.33
+  },
+  "results": [
+    {
+      "productName": "Steel Frame",
+      "materialType": "Steel",
+      "weight": 15,
+      "quantity": 200,
+      "totalWeight": 3000,
+      "materialEmissions": 5550,
+      "emissionFactor": 1.85,
+      "unit": "kg CO2e"
+    },
+    {
+      "productName": "Plastic Case",
+      "materialType": "Plastic",
+      "weight": 0.5,
+      "quantity": 500,
+      "totalWeight": 250,
+      "materialEmissions": 1500,
+      "emissionFactor": 6,
+      "unit": "kg CO2e"
+    },
+    {
+      "productName": "Cotton T-Shirt",
+      "materialType": "Cotton",
+      "weight": 0.2,
+      "quantity": 1000,
+      "totalWeight": 200,
+      "materialEmissions": 1060,
+      "emissionFactor": 5.3,
+      "unit": "kg CO2e"
+    }
+  ],
+  "errors": [
+    {
+      "productName": "Unknown Material Item",
+      "error": "Material type \"Vibranium\" not found in database"
+    }
+  ]
+}`,
+  goal: `Analyze the following sustainability targets for a manufacturing operation and outline the three most critical strategic initiatives required to achieve them. The primary goal is to significantly reduce the carbon intensity of goods and eliminate data calculation errors. Targets include: 1) A 15% reduction in the emission factor for Steel (from $1.85$ to $\le 1.57 \text{ kg } \text{CO}_2\text{e}$/kg), which is the largest contributor ($68.4\%$); 2) Achieving a $100\%$ successful calculation rate by integrating all missing material emission factors; and 3) Piloting sustainable sourcing to reduce Cotton T-Shirt emissions by $5\%$ (from $1,060$ to $\le 1,007 \text{ kg } \text{CO}_2\text{e}$). The output should be a prioritized list of three initiatives with brief justifications.`,
   urgency: 'quarter',
 };
 
@@ -70,6 +118,35 @@ const TICKER_MESSAGES = [
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
+
+const arrayLength = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  if (isRecord(value) && Array.isArray(value.items)) {
+    return value.items.length;
+  }
+  return 0;
+};
+
+const cleanseJsonText = (value: string) =>
+  value.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+const safeParseJson = (value: unknown): Record<string, unknown> | null => {
+  if (isRecord(value)) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    return JSON.parse(cleanseJsonText(value));
+  } catch {
+    return null;
+  }
+};
 
 export default function Home() {
   const [formData, setFormData] = useState<FormState>(DEFAULT_FORM);
@@ -144,33 +221,76 @@ export default function Home() {
 
   const insightToString = (insight: AgentInsight | null) => {
     if (!insight) return 'Awaiting agent output…';
-    if (insight.parsed) {
-      try {
-        return JSON.stringify(insight.parsed, null, 2);
-      } catch {
-        // noop
-      }
+
+    const parsed =
+      (insight.parsed && safeParseJson(insight.parsed)) || safeParseJson(insight.raw);
+
+    if (parsed) {
+      return JSON.stringify(parsed, null, 2);
     }
+
     return insight.raw ?? 'Awaiting agent output…';
   };
 
+  const parsedOptimization = useMemo(() => {
+    if (!result?.optimization) {
+      return null;
+    }
+
+    if (isRecord(result.optimization.parsed)) {
+      return result.optimization.parsed;
+    }
+
+    return safeParseJson(result.optimization.raw);
+  }, [result?.optimization]);
+
   const aggregatedImpactCount = useMemo(() => {
-    if (!result?.analysis?.parsed || !isRecord(result.analysis.parsed)) {
+    if (!parsedOptimization) {
       return null;
     }
 
-    const categories = result.analysis.parsed.impact_categories;
+    const analysis = isRecord(parsedOptimization.analysis)
+      ? parsedOptimization.analysis
+      : parsedOptimization;
 
-    if (!isRecord(categories)) {
-      return null;
+    const counts = { high: 0, medium: 0, low: 0 };
+    console.log("analysis", analysis)
+    const impactAnalysisSources = [
+      isRecord(analysis.impact_analysis) ? analysis.impact_analysis : null,
+      isRecord(parsedOptimization.impact_analysis) ? parsedOptimization.impact_analysis : null,
+    ].filter(Boolean) as Record<string, unknown>[];
+
+    for (const source of impactAnalysisSources) {
+      counts.high = Math.max(counts.high, arrayLength(source.high_impact));
+      counts.medium = Math.max(counts.medium, arrayLength(source.medium_impact));
+      counts.low = Math.max(counts.low, arrayLength(source.low_impact));
+    }
+    console.log("counts", counts)
+    if (counts.high || counts.medium || counts.low) {
+      return counts;
     }
 
-    const high = Array.isArray(categories.high_impact) ? categories.high_impact.length : 0;
-    const medium = Array.isArray(categories.medium_impact) ? categories.medium_impact.length : 0;
-    const low = Array.isArray(categories.low_impact) ? categories.low_impact.length : 0;
+    const productSources = [
+      Array.isArray(analysis.product_analysis) ? analysis.product_analysis : null,
+      Array.isArray(parsedOptimization.product_analysis) ? parsedOptimization.product_analysis : null,
+    ].filter(Boolean) as Array<Record<string, unknown>>[];
 
-    return { high, medium, low };
-  }, [result?.analysis?.parsed]);
+    for (const list of productSources) {
+      list.forEach((entry) => {
+        if (!isRecord(entry)) return;
+        const impactLevel = String(entry.impact_level ?? '').toLowerCase();
+        if (impactLevel.includes('high')) counts.high += 1;
+        else if (impactLevel.includes('medium')) counts.medium += 1;
+        else if (impactLevel.includes('low')) counts.low += 1;
+      });
+    }
+
+    if (counts.high || counts.medium || counts.low) {
+      return counts;
+    }
+
+    return null;
+  }, [parsedOptimization]);
 
   const phaseStatus = (key: (typeof AGENT_PHASES)[number]['key']) => {
     if (result) {
