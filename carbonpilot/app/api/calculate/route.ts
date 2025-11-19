@@ -203,11 +203,21 @@ export async function POST(request: Request) {
     }
 
     const agentData = await agentResponse.json();
-    const sessionState = await fetchSessionState(userId, sessionId);
+    // Session state fetching is disabled as the ADK server may not persist state for retrieval
+    // and the run response should contain the necessary data.
+    const sessionState = null; // await fetchSessionState(userId, sessionId);
 
-    const analysisValue = pluckStateValue('analysis_results', sessionState, agentData);
-    const optimizationValue = pluckStateValue('optimization_plan', sessionState, agentData);
-    const finalPlanValue = pluckStateValue('final_plan', sessionState, agentData);
+    console.log('[CarbonPilot] Raw agentData:', JSON.stringify(agentData, null, 2));
+
+    const analysisValue = pluckStateValue('analysis_results', agentData, sessionState);
+    const optimizationValue = pluckStateValue('optimization_plan', agentData, sessionState);
+    const finalPlanValue = pluckStateValue('final_plan', agentData, sessionState);
+
+    console.log('[CarbonPilot] Extracted values:', {
+      analysis: analysisValue ? 'Found' : 'Not found',
+      optimization: optimizationValue ? 'Found' : 'Not found',
+      finalPlan: finalPlanValue ? 'Found' : 'Not found',
+    });
 
     return NextResponse.json<AgentResponsePayload>({
       ok: true,

@@ -1,4 +1,14 @@
 from google.adk.agents.llm_agent import LlmAgent
+import os
+import json
+
+# Load business requirements
+req_path = os.path.join(os.path.dirname(__file__), 'business_requirements.json')
+try:
+    with open(req_path, 'r') as f:
+        business_requirements = f.read()
+except FileNotFoundError:
+    business_requirements = "No business requirements found."
 
 # Assume 'analyzer_agent' is the agent you defined in your question.
 # analyzer_agent = LlmAgent(...) 
@@ -8,18 +18,23 @@ loop_agent = LlmAgent(
     model="gemini-2.0-flash", # Using a more powerful model for creative, strategic recommendations
     description="Generates actionable strategies to reduce carbon footprint based on analysis",
     
-    instruction="""
+    instruction=f"""
     You are the Loop Agent orchestrating business requirement capture and optimization alignment.
+    
+    CRITICAL: Return ONLY the JSON object. Do NOT include any explanatory text before or after the JSON.
+    Do NOT wrap in markdown code blocks. Do NOT add commentary. ONLY return raw JSON starting with {{ and ending with }}.
+    
     Your goal is to transform analyzer insights into concrete demo business requirements, persist them, and then refine optimization advice accordingly.
 
     IMPORTANT: You ONLY focus on the 'high_impact' and 'medium_impact' categories provided. Ignore 'low_impact' items for optimization.
 
+    CURRENT BUSINESS REQUIREMENTS:
+    {business_requirements}
+
     WORKFLOW:
     1. Parse the JSON payload from the Analyzer Agent and extract the most critical challenges, opportunities, and quick wins.
-    2. Draft a concise demo business requirements artifact that covers objectives, measurable success criteria, stakeholders, and operational constraints. Save this artifact to `business_requirements.json`, overwriting the previous demo each run.
-    3. Re-read both the Analyzer payload and the freshly saved `business_requirements.json`.
-    4. Evaluate the optimizations suggested by the Analyzer Agent, refining or extending them so they align with the documented business requirements.
-    5. Output the enhanced optimization plan using the schema below.
+    2. Evaluate the optimizations suggested by the Analyzer Agent, refining or extending them so they align with the CURRENT BUSINESS REQUIREMENTS provided above.
+    3. Output the enhanced optimization plan using the schema below.
 
     RECOMMENDATION FRAMEWORK:
     For each high and medium impact product, formulate your advice considering these angles:
@@ -44,51 +59,56 @@ loop_agent = LlmAgent(
 
     OUTPUT REQUIREMENTS:
     Provide your recommendations in this EXACT JSON structure. Do NOT add any text or explanations outside of the JSON block.
+    Do NOT change key names. Do NOT add extra nesting levels. Do NOT wrap the JSON in markdown code blocks (e.g., ```json ... ```).
+    The output must be a raw JSON string starting with '{' and ending with '}'.
 
-    {
-      "optimization_strategies": {
+    {{
+      "optimization_strategies": {{
         "high_impact_recommendations": [
-          {
+          {{
             "product_name": "string (from input)",
             "current_material": "string (from input)",
             "primary_issue": "High Emission Factor / High Volume / Both",
             "proposed_strategies": [
-              {
+              {{
                 "strategy_type": "Material Substitution | Supplier Engagement | Product Redesign | Process Improvement",
                 "specific_actions": [
                     "Actionable step 1 for this strategy.",
                     "Actionable step 2 for this strategy."
                 ],
                 "expected_outcome": "Brief description of the expected positive environmental impact."
-              }
+              }}
             ]
-          }
+          }}
         ],
         "medium_impact_recommendations": [
-          {
+          {{
             "product_name": "string (from input)",
             "current_material": "string (from input)",
             "primary_issue": "High Emission Factor / High Volume / Both",
             "proposed_strategies": [
-              {
+              {{
                 "strategy_type": "Material Substitution | Supplier Engagement | Product Redesign | Process Improvement",
                 "specific_actions": [
                     "Actionable step 1.",
                     "Actionable step 2."
                 ],
                 "expected_outcome": "Brief description of the expected positive environmental impact."
-              }
+              }}
             ]
-          }
+          }}
         ]
-      },
-      "strategic_summary": {
+      }},
+      "strategic_summary": {{
         "overall_recommendation": "A brief, high-level summary of the most critical action to take.",
         "synergy_opportunities": "Identify if strategies for different products can be combined (e.g., sourcing the same sustainable alternative for multiple products)."
-      }
-    }
+      }}
+    }}
 
     RULES:
+    - STRICTLY FOLLOW THE JSON SCHEMA ABOVE.
+    - Do NOT rename keys (e.g., do not use "strategies" instead of "proposed_strategies").
+    - Do NOT add extra nesting (e.g., do not wrap the whole object in a "result" key).
     - BE SPECIFIC AND ACTIONABLE. Avoid vague advice like "be more green."
     - Ground your recommendations in the data provided (e.g., "Since Aluminum has a high emission factor...").
     - Focus ONLY on the 'high_impact' and 'medium_impact' products from the input.

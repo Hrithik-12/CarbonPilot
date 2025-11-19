@@ -155,6 +155,14 @@ export default function Home() {
   const [result, setResult] = useState<AgentSuccessPayload | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [tickerMessage, setTickerMessage] = useState(TICKER_MESSAGES[0]);
+  const [showDashboardModal, setShowDashboardModal] = useState(false);
+
+  useEffect(() => {
+    // Show modal when results are available
+    if (result && !loading) {
+      setShowDashboardModal(true);
+    }
+  }, [result, loading]);
 
   useEffect(() => {
     if (!loading) {
@@ -202,11 +210,18 @@ export default function Home() {
       }
 
       setResult(body.data);
+      // Store data in sessionStorage for dashboard
+      sessionStorage.setItem('carbonPilotResults', JSON.stringify(body.data));
     } catch (agentError) {
       setError(agentError instanceof Error ? agentError.message : 'Unexpected error occurred.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const openDashboard = () => {
+    window.open('/dashboard', '_blank');
+    setShowDashboardModal(false);
   };
 
   const copyToClipboard = async (text: string, section: string) => {
@@ -232,6 +247,18 @@ export default function Home() {
     return insight.raw ?? 'Awaiting agent output…';
   };
 
+  const parsedAnalysis = useMemo(() => {
+    if (!result?.analysis) {
+      return null;
+    }
+
+    if (isRecord(result.analysis.parsed)) {
+      return result.analysis.parsed;
+    }
+
+    return safeParseJson(result.analysis.raw);
+  }, [result?.analysis]);
+
   const parsedOptimization = useMemo(() => {
     if (!result?.optimization) {
       return null;
@@ -245,52 +272,37 @@ export default function Home() {
   }, [result?.optimization]);
 
   const aggregatedImpactCount = useMemo(() => {
-    if (!parsedOptimization) {
+    if (!parsedAnalysis) {
       return null;
     }
 
-    const analysis = isRecord(parsedOptimization.analysis)
-      ? parsedOptimization.analysis
-      : parsedOptimization;
-
     const counts = { high: 0, medium: 0, low: 0 };
-    console.log("analysis", analysis)
-    const impactAnalysisSources = [
-      isRecord(analysis.impact_analysis) ? analysis.impact_analysis : null,
-      isRecord(parsedOptimization.impact_analysis) ? parsedOptimization.impact_analysis : null,
-    ].filter(Boolean) as Record<string, unknown>[];
+    console.log("parsedAnalysis", parsedAnalysis);
 
-    for (const source of impactAnalysisSources) {
-      counts.high = Math.max(counts.high, arrayLength(source.high_impact));
-      counts.medium = Math.max(counts.medium, arrayLength(source.medium_impact));
-      counts.low = Math.max(counts.low, arrayLength(source.low_impact));
+    // Try multiple possible structures the agents might return
+    let analysisData = parsedAnalysis;
+    
+    // Try: analysis_results.high_impact
+    if (isRecord(parsedAnalysis.analysis_results)) {
+      analysisData = parsedAnalysis.analysis_results;
     }
-    console.log("counts", counts)
-    if (counts.high || counts.medium || counts.low) {
-      return counts;
+    // Try: analysis.categories.high_impact (current incorrect format)
+    else if (isRecord(parsedAnalysis.analysis) && isRecord((parsedAnalysis.analysis as Record<string, unknown>).categories)) {
+      analysisData = (parsedAnalysis.analysis as Record<string, unknown>).categories as Record<string, unknown>;
     }
 
-    const productSources = [
-      Array.isArray(analysis.product_analysis) ? analysis.product_analysis : null,
-      Array.isArray(parsedOptimization.product_analysis) ? parsedOptimization.product_analysis : null,
-    ].filter(Boolean) as Array<Record<string, unknown>>[];
+    console.log("analysisData", analysisData);
 
-    for (const list of productSources) {
-      list.forEach((entry) => {
-        if (!isRecord(entry)) return;
-        const impactLevel = String(entry.impact_level ?? '').toLowerCase();
-        if (impactLevel.includes('high')) counts.high += 1;
-        else if (impactLevel.includes('medium')) counts.medium += 1;
-        else if (impactLevel.includes('low')) counts.low += 1;
-      });
+    // Count high_impact, medium_impact, low_impact arrays
+    if (isRecord(analysisData)) {
+      counts.high = arrayLength(analysisData.high_impact);
+      counts.medium = arrayLength(analysisData.medium_impact);
+      counts.low = arrayLength(analysisData.low_impact);
     }
 
-    if (counts.high || counts.medium || counts.low) {
-      return counts;
-    }
-
-    return null;
-  }, [parsedOptimization]);
+    console.log("counts", counts);
+    return counts;
+  }, [parsedAnalysis]);
 
   const phaseStatus = (key: (typeof AGENT_PHASES)[number]['key']) => {
     if (result) {
@@ -485,7 +497,7 @@ export default function Home() {
               </div>
               <div className="rounded-2xl bg-white/10 px-5 py-3 text-right text-white">
                 <p className="text-xs uppercase tracking-[0.4em] text-white/60">Session</p>
-                <p className="text-lg font-semibold">{result?.metadata?.sessionId ?? '—'}</p>
+                <p className="text-lg font-semibold">{String(result?.metadata?.sessionId ?? '—')}</p>
               </div>
             </div>
 
@@ -583,6 +595,38 @@ export default function Home() {
           )}
         </main>
       </div>
+
+      {/* Dashboard Modal */}
+      {showDashboardModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-emerald-400/30 rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <div className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 bg-emerald-400/20 rounded-full flex items-center justify-center">
+                <Sparkles className="h-8 w-8 text-emerald-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">Analysis Complete!</h3>
+              <p className="text-slate-300 mb-6">
+                Your carbon footprint analysis is ready. Would you like to view the interactive dashboard?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDashboardModal(false)}
+                  className="flex-1 px-6 py-3 rounded-xl border border-slate-600 text-slate-300 font-semibold hover:bg-slate-700 transition"
+                >
+                  View Here
+                </button>
+                <button
+                  onClick={openDashboard}
+                  className="flex-1 px-6 py-3 rounded-xl bg-emerald-400 text-slate-900 font-semibold hover:bg-emerald-300 transition flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="h-5 w-5" />
+                  Open Dashboard
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
