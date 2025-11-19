@@ -1,103 +1,469 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Copy,
+  Factory,
+  GaugeCircle,
+  LineChart,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
+
+type FormState = {
+  scenario: string;
+  dataSnapshot: string;
+  goal: string;
+  urgency: 'immediate' | 'quarter' | 'long-term';
+};
+
+type AgentInsight = {
+  raw: string | null;
+  parsed: unknown | null;
+};
+
+type AgentSuccessPayload = {
+  analysis: AgentInsight;
+  optimization: AgentInsight;
+  finalPlan: AgentInsight;
+  metadata: Record<string, unknown>;
+};
+
+type ApiResponse =
+  | { ok: true; data: AgentSuccessPayload }
+  | { ok: false; error: string };
+
+const DEFAULT_FORM: FormState = {
+  scenario: '',
+  dataSnapshot: '',
+  goal: '',
+  urgency: 'quarter',
+};
+
+const AGENT_PHASES = [
+  {
+    key: 'analysis',
+    title: 'Analyzer Agent',
+    description: 'Categorizes carbon drivers & identifies priority materials.',
+  },
+  {
+    key: 'optimization',
+    title: 'Optimizer Agent',
+    description: 'Generates targeted strategies across materials & suppliers.',
+  },
+  {
+    key: 'finalPlan',
+    title: 'Loop Agent',
+    description: 'Aligns recommendations with demo business requirements.',
+  },
+] as const;
+
+const TICKER_MESSAGES = [
+  '📡 Calibrating emission sensors…',
+  '🧠 Mapping analyzer context to Gemini 2.0 Flash…',
+  '🔁 Syncing optimization feedback loop…',
+  '📦 Evaluating supplier alternatives…',
+  '🚀 Finalizing orchestration output…',
+];
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [formData, setFormData] = useState<FormState>(DEFAULT_FORM);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<AgentSuccessPayload | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [tickerMessage, setTickerMessage] = useState(TICKER_MESSAGES[0]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  useEffect(() => {
+    if (!loading) {
+      setTickerMessage('Ready for the next scenario');
+      return;
+    }
+
+    let i = 0;
+    const interval = setInterval(() => {
+      setTickerMessage(TICKER_MESSAGES[i % TICKER_MESSAGES.length]);
+      i += 1;
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const runCarbonPilot = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!formData.scenario.trim() || !formData.dataSnapshot.trim()) {
+      setError('Provide both a scenario overview and a data snapshot to run the pipeline.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const response = await fetch('/api/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const body = (await response.json()) as ApiResponse;
+
+      if (!body.ok) {
+        throw new Error(body.error ?? 'Agent invocation failed.');
+      }
+
+      setResult(body.data);
+    } catch (agentError) {
+      setError(agentError instanceof Error ? agentError.message : 'Unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string, section: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(section);
+      setTimeout(() => setCopied(null), 2200);
+    } catch (copyError) {
+      console.error('Clipboard error:', copyError);
+    }
+  };
+
+  const insightToString = (insight: AgentInsight | null) => {
+    if (!insight) return 'Awaiting agent output…';
+    if (insight.parsed) {
+      try {
+        return JSON.stringify(insight.parsed, null, 2);
+      } catch {
+        // noop
+      }
+    }
+    return insight.raw ?? 'Awaiting agent output…';
+  };
+
+  const aggregatedImpactCount = useMemo(() => {
+    if (!result?.analysis?.parsed || !isRecord(result.analysis.parsed)) {
+      return null;
+    }
+
+    const categories = result.analysis.parsed.impact_categories;
+
+    if (!isRecord(categories)) {
+      return null;
+    }
+
+    const high = Array.isArray(categories.high_impact) ? categories.high_impact.length : 0;
+    const medium = Array.isArray(categories.medium_impact) ? categories.medium_impact.length : 0;
+    const low = Array.isArray(categories.low_impact) ? categories.low_impact.length : 0;
+
+    return { high, medium, low };
+  }, [result?.analysis?.parsed]);
+
+  const phaseStatus = (key: (typeof AGENT_PHASES)[number]['key']) => {
+    if (result) {
+      const section = result[key];
+      if (section && (section.raw || section.parsed)) {
+        return 'complete';
+      }
+    }
+    return loading ? 'running' : 'idle';
+  };
+
+  const renderInsightCard = (
+    key: string,
+    title: string,
+    insight: AgentInsight | null,
+    accent: string,
+    Icon: typeof LineChart,
+  ) => {
+    const text = insightToString(insight);
+
+    return (
+      <section className={`rounded-2xl border ${accent} bg-white/80 backdrop-blur shadow-sm`}>
+        <header className="flex items-center justify-between border-b border-black/5 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="rounded-lg bg-black/5 p-2">
+              <Icon className="h-5 w-5 text-slate-700" />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-slate-500">Agent Output</p>
+              <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => copyToClipboard(text, key)}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            {copied === key ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                Copy
+              </>
+            )}
+          </button>
+        </header>
+        <div className="max-h-[420px] overflow-y-auto px-6 py-4 text-sm leading-relaxed text-slate-800">
+          {text ? (
+            <pre className="whitespace-pre-wrap rounded-xl bg-slate-50/80 p-4 text-left font-mono text-xs text-slate-900 shadow-inner">
+              {text}
+            </pre>
+          ) : (
+            <p className="text-slate-500">Awaiting agent output…</p>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </section>
+    );
+  };
+
+  return (
+    <div className="carbon-grid min-h-screen px-4 py-8 text-slate-900">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 lg:flex-row">
+        {/* Intake Form */}
+        <aside className="lg:w-[32%]">
+          <div className="sticky top-6 rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur">
+            <div className="mb-6 flex items-center gap-4">
+              <div className="rounded-2xl bg-emerald-400/20 p-3">
+                <Factory className="h-6 w-6 text-emerald-300" />
+              </div>
+              <div>
+                <p className="text-sm uppercase tracking-[0.2em] text-slate-300">Carbon Pilot</p>
+                <h1 className="text-2xl font-semibold text-white">Scenario Console</h1>
+              </div>
+            </div>
+
+            <form className="space-y-5" onSubmit={runCarbonPilot}>
+              <label className="block space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
+                  Scenario Overview *
+                </span>
+                <textarea
+                  name="scenario"
+                  value={formData.scenario}
+                  onChange={handleInputChange}
+                  placeholder="Describe the plant, production line, or business objective driving this analysis."
+                  rows={4}
+                  className="w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
+                  Data Snapshot *
+                </span>
+                <textarea
+                  name="dataSnapshot"
+                  value={formData.dataSnapshot}
+                  onChange={handleInputChange}
+                  placeholder="List the pre-calculated emission values, product names, material mixes, and supporting metrics."
+                  rows={6}
+                  className="w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
+                  Sustainability Goal
+                </span>
+                <textarea
+                  name="goal"
+                  value={formData.goal}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Cut Category 3 emissions by 15% in FY26, prioritize recycled aluminum, etc."
+                  rows={3}
+                  className="w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
+                  Urgency
+                </span>
+                <select
+                  name="urgency"
+                  value={formData.urgency}
+                  onChange={handleInputChange}
+                  className="w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-white focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                >
+                  <option value="immediate" className="bg-slate-900 text-white">
+                    Immediate Hotfix
+                  </option>
+                  <option value="quarter" className="bg-slate-900 text-white">
+                    This Quarter
+                  </option>
+                  <option value="long-term" className="bg-slate-900 text-white">
+                    Long-Term Transformation
+                  </option>
+                </select>
+              </label>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 py-3 text-base font-semibold text-slate-900 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-emerald-400/60"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Running agents…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-5 w-5" />
+                    Run Carbon Pilot
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/80">
+              {loading ? 'Multi-agent pipeline active' : 'Standing by'} — {tickerMessage}
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-2xl border border-red-400 bg-red-500/10 p-4 text-sm text-red-100">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4" />
+                  <div>
+                    <p className="font-semibold text-red-200">Pipeline error</p>
+                    <p>{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Agent Output */}
+        <main className="flex-1 space-y-6">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-[0.3em] text-emerald-200">Agent Control</p>
+                <h2 className="text-3xl font-semibold text-white">Real-time Orchestration</h2>
+                <p className="mt-2 text-sm text-white/70">
+                  Analyzer ➜ Optimizer ➜ Loop agent flow mirrored from the LinkedIn reference implementation.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-5 py-3 text-right text-white">
+                <p className="text-xs uppercase tracking-[0.4em] text-white/60">Session</p>
+                <p className="text-lg font-semibold">{result?.metadata?.sessionId ?? '—'}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-white">
+                <p className="text-xs uppercase tracking-[0.4em] text-white/50">High Impact</p>
+                <p className="text-3xl font-semibold">{aggregatedImpactCount?.high ?? 0}</p>
+                <p className="text-sm text-white/60">Products flagged</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-white">
+                <p className="text-xs uppercase tracking-[0.4em] text-white/50">Medium Impact</p>
+                <p className="text-3xl font-semibold">{aggregatedImpactCount?.medium ?? 0}</p>
+                <p className="text-sm text-white/60">Products flagged</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-white">
+                <p className="text-xs uppercase tracking-[0.4em] text-white/50">Low Impact</p>
+                <p className="text-3xl font-semibold">{aggregatedImpactCount?.low ?? 0}</p>
+                <p className="text-sm text-white/60">Products with minimal risk</p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              {AGENT_PHASES.map((phase) => {
+                const status = phaseStatus(phase.key);
+                return (
+                  <div
+                    key={phase.key}
+                    className={`rounded-2xl border p-4 ${
+                      status === 'complete'
+                        ? 'border-emerald-400/60 bg-emerald-400/10 text-emerald-50'
+                        : status === 'running'
+                        ? 'border-amber-300/40 bg-amber-300/10 text-amber-50'
+                        : 'border-white/10 bg-white/5 text-white/70'
+                    }`}
+                  >
+                    <p className="text-xs uppercase tracking-[0.4em]">
+                      {status === 'complete' ? 'Complete' : status === 'running' ? 'Running' : 'Queued'}
+                    </p>
+                    <p className="mt-2 text-xl font-semibold">{phase.title}</p>
+                    <p className="mt-1 text-sm">{phase.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {loading && (
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center text-white">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+                <Loader2 className="h-8 w-8 animate-spin text-white" />
+              </div>
+              <p className="text-lg font-semibold">Agents are synthesizing insights…</p>
+              <p className="text-sm text-white/60">
+                Analyzer feeds Optimizer, which then hands context to the Loop Agent for business alignment.
+              </p>
+            </div>
+          )}
+
+          {!loading && !result && (
+            <div className="rounded-3xl border border-dashed border-white/20 bg-white/5 p-10 text-center text-white/70">
+              Feed the console to see analyzer, optimizer, and loop agent outputs serialized just like the LinkedIn reference build.
+            </div>
+          )}
+
+          {!loading && result && (
+            <div className="space-y-6">
+              {renderInsightCard('analysis', 'Analyzer Output', result.analysis, 'border-emerald-100', LineChart)}
+              {renderInsightCard('optimization', 'Optimizer Output', result.optimization, 'border-blue-100', GaugeCircle)}
+              {renderInsightCard('finalPlan', 'Loop Agent Output', result.finalPlan, 'border-purple-100', Sparkles)}
+            </div>
+          )}
+
+          {!loading && result && (
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-white">
+              <p className="text-xs uppercase tracking-[0.4em] text-white/60">Metadata</p>
+              <div className="mt-3 grid gap-4 md:grid-cols-3">
+                <div>
+                  <p className="text-sm text-white/60">Session</p>
+                  <p className="text-lg font-semibold text-white">{result.metadata.sessionId as string}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-white/60">User</p>
+                  <p className="text-lg font-semibold text-white">{(result.metadata.userId as string) ?? 'carbonpilot_user'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-white/60">Collected</p>
+                  <p className="text-lg font-semibold text-white">
+                    {result.metadata.collectedAt
+                      ? new Date(result.metadata.collectedAt as string).toLocaleString()
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
+
