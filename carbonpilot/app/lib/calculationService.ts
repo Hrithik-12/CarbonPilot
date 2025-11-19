@@ -1,10 +1,10 @@
-import emissionData from '@/app/data/emission-factor.json';
+import emissionData from "../data/emission-factor.json";
 import type {
   EmissionDatabase,
   ProductData,
   ProductFootprintResult,
-  BatchCalculationResult
-} from '@/types/carbon';
+  BatchCalculationResult,
+} from "../../types/carbon";
 
 // Type assertion for imported JSON
 const typedEmissionData = emissionData as EmissionDatabase;
@@ -15,22 +15,22 @@ const typedEmissionData = emissionData as EmissionDatabase;
 export function calculateProductFootprint(
   product: ProductData
 ): ProductFootprintResult {
-  const materialType = product['Material Type'];
-  const weight = parseFloat(String(product['Weight (kg)']));
-  const quantity = parseInt(String(product['Quantity']));
+  const materialType = product["Material Type"];
+  const weight = parseFloat(String(product["Weight (kg)"]));
+  const quantity = parseInt(String(product["Quantity"]));
 
   // Validation
   if (isNaN(weight) || isNaN(quantity)) {
     return {
-      productName: product['Product Name'],
+      productName: product["Product Name"],
       materialType,
       weight: 0,
       quantity: 0,
       totalWeight: 0,
       materialEmissions: 0,
       emissionFactor: 0,
-      unit: 'kg CO2e',
-      error: 'Invalid weight or quantity values'
+      unit: "kg CO2e",
+      error: "Invalid weight or quantity values",
     };
   }
 
@@ -39,15 +39,15 @@ export function calculateProductFootprint(
 
   if (!materialData) {
     return {
-      productName: product['Product Name'],
+      productName: product["Product Name"],
       materialType,
       weight,
       quantity,
       totalWeight: 0,
       materialEmissions: 0,
       emissionFactor: 0,
-      unit: 'kg CO2e',
-      error: `Material type "${materialType}" not found in database`
+      unit: "kg CO2e",
+      error: `Material type "${materialType}" not found in database`,
     };
   }
 
@@ -56,14 +56,14 @@ export function calculateProductFootprint(
   const materialEmissions = totalWeight * materialData.co2_per_kg;
 
   return {
-    productName: product['Product Name'],
+    productName: product["Product Name"],
     materialType,
     weight,
     quantity,
     totalWeight: parseFloat(totalWeight.toFixed(2)),
     materialEmissions: parseFloat(materialEmissions.toFixed(2)),
     emissionFactor: materialData.co2_per_kg,
-    unit: 'kg CO2e'
+    unit: "kg CO2e",
   };
 }
 
@@ -73,15 +73,15 @@ export function calculateProductFootprint(
 export function calculateBatchFootprint(
   products: ProductData[]
 ): BatchCalculationResult {
-  const results = products.map(product => calculateProductFootprint(product));
+  const results = products.map((product) => calculateProductFootprint(product));
 
   // Separate valid results and errors
-  const validResults = results.filter(r => !r.error);
+  const validResults = results.filter((r) => !r.error);
   const errorResults = results
-    .filter(r => r.error)
-    .map(r => ({
+    .filter((r) => r.error)
+    .map((r) => ({
       productName: r.productName,
-      error: r.error || 'Unknown error'
+      error: r.error || "Unknown error",
     }));
 
   // Calculate totals
@@ -89,14 +89,10 @@ export function calculateBatchFootprint(
     (sum, r) => sum + r.materialEmissions,
     0
   );
-  const totalWeight = validResults.reduce(
-    (sum, r) => sum + r.totalWeight,
-    0
-  );
+  const totalWeight = validResults.reduce((sum, r) => sum + r.totalWeight, 0);
 
-  const averageEmissions = validResults.length > 0 
-    ? totalEmissions / validResults.length 
-    : 0;
+  const averageEmissions =
+    validResults.length > 0 ? totalEmissions / validResults.length : 0;
 
   return {
     summary: {
@@ -105,10 +101,10 @@ export function calculateBatchFootprint(
       failedCalculations: errorResults.length,
       totalEmissions: parseFloat(totalEmissions.toFixed(2)),
       totalWeight: parseFloat(totalWeight.toFixed(2)),
-      averageEmissionsPerProduct: parseFloat(averageEmissions.toFixed(2))
+      averageEmissionsPerProduct: parseFloat(averageEmissions.toFixed(2)),
     },
     results: validResults,
-    errors: errorResults
+    errors: errorResults,
   };
 }
 
