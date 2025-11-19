@@ -9,14 +9,15 @@ with each agent's output feeding into the next agent in the sequence.
 from google.adk.agents import SequentialAgent
 from .subagents.analyzer_agent import analyzer_agent
 from .subagents.optimizer_agent import optimizer_agent
-
+from .subagents.loop_agent import loop_agent
 
 # Create the Sequential Pipeline following proper sequential pattern
 root_agent = SequentialAgent(
     name="pilot",
     sub_agents=[
         analyzer_agent,  # Step 1: Analyze carbon footprint data
-        optimizer_agent  # Step 2: Identify optimization opportunities
+        optimizer_agent , # Step 2: Identify optimization opportunities
+        loop_agent
     ],
     description="Sequential pipeline: analyzes carbon data and identifies optimization opportunities",
 )

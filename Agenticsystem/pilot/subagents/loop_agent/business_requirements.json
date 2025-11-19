@@ -1,0 +1,34 @@
+{
+  "business_requirements": {
+    "version": "demo-1.0",
+    "objectives": [
+      "Cut cradle-to-gate emissions for the top three SKUs by 15% within 12 months",
+      "Increase use of recycled or certified low-carbon materials to 40% of total volume",
+      "Standardize supplier sustainability scorecards across the top five vendors"
+    ],
+    "success_metrics": [
+      "kg CO2e per unit reduction tracked monthly",
+      "Percentage of qualified suppliers meeting renewable energy targets",
+      "Reduction in scrap or rework rates linked to material substitutions"
+    ],
+    "stakeholders": [
+      {
+        "role": "VP of Sustainability",
+        "focus": "Portfolio-level emissions trajectory and regulatory readiness"
+      },
+      {
+        "role": "Procurement Lead",
+        "focus": "Supplier engagement, contract updates, and cost controls"
+      },
+      {
+        "role": "Manufacturing Engineer",
+        "focus": "Process qualifications, throughput, and quality assurance"
+      }
+    ],
+    "constraints": [
+      "Avoid >5% increase in unit cost without a defined payback",
+      "Maintain existing production takt times during pilot phases",
+      "Document chain-of-custody for all new materials"
+    ]
+  }
+}
