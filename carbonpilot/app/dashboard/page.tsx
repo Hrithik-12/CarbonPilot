@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, TrendingDown, TrendingUp, Target, Zap, Sparkles } from 'lucide-react';
+import { ArrowLeft, TrendingDown, TrendingUp, Target, Zap, Sparkles, CheckCircle2, ChevronDown, ChevronUp, Lightbulb, ArrowRight, TrendingDownIcon } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 
 type DashboardData = {
@@ -13,6 +13,9 @@ type DashboardData = {
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [expandedStrategies, setExpandedStrategies] = useState<Set<string>>(new Set());
+  const [completedActions, setCompletedActions] = useState<Set<string>>(new Set());
+  const [hoveredStrategy, setHoveredStrategy] = useState<string | null>(null);
 
   useEffect(() => {
     // Get data from sessionStorage
@@ -23,6 +26,26 @@ export default function Dashboard() {
       setData(parsed);
     }
   }, []);
+
+  const toggleStrategy = (id: string) => {
+    const newExpanded = new Set(expandedStrategies);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedStrategies(newExpanded);
+  };
+
+  const toggleAction = (actionId: string) => {
+    const newCompleted = new Set(completedActions);
+    if (newCompleted.has(actionId)) {
+      newCompleted.delete(actionId);
+    } else {
+      newCompleted.add(actionId);
+    }
+    setCompletedActions(newCompleted);
+  };
 
   if (!data) {
     return (
@@ -187,21 +210,29 @@ export default function Dashboard() {
           {/* Bar Chart */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur">
             <h2 className="text-2xl font-bold mb-6 text-emerald-400">Emissions by Product</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={barChartData}>
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 60, bottom: 80 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                 <XAxis 
                   dataKey="name" 
                   stroke="#94a3b8" 
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
+                  tick={{ fill: '#94a3b8', fontSize: 11 }}
                   angle={-45}
                   textAnchor="end"
-                  height={80}
+                  height={100}
                 />
                 <YAxis 
                   stroke="#94a3b8" 
                   tick={{ fill: '#94a3b8' }}
-                  label={{ value: 'kg CO₂e', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                  label={{ 
+                    value: 'kg CO₂e', 
+                    angle: -90, 
+                    position: 'insideLeft', 
+                    fill: '#94a3b8',
+                    offset: 10,
+                    style: { textAnchor: 'middle' }
+                  }}
+                  width={80}
                 />
                 <Tooltip 
                   contentStyle={{ 
@@ -224,17 +255,23 @@ export default function Dashboard() {
           {/* Pie Chart */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur">
             <h2 className="text-2xl font-bold mb-6 text-emerald-400">Emission Distribution</h2>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
               <PieChart>
                 <Pie
                   data={pieChartData}
                   cx="50%"
-                  cy="50%"
+                  cy="45%"
                   labelLine={false}
-                  label={({ name, percent }: any) => `${name}: ${((percent || 0) * 100).toFixed(1)}%`}
-                  outerRadius={100}
+                  label={({ percent }: any) => {
+                    const percentValue = ((percent || 0) * 100).toFixed(1);
+                    // Only show label if percentage is > 3% to avoid congestion
+                    return parseFloat(percentValue) > 3 ? `${percentValue}%` : '';
+                  }}
+                  outerRadius={90}
+                  innerRadius={40}
                   fill="#8884d8"
                   dataKey="value"
+                  paddingAngle={2}
                 >
                   {pieChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={getColor(index)} />
@@ -247,7 +284,22 @@ export default function Dashboard() {
                     borderRadius: '8px',
                     color: '#fff'
                   }}
-                  formatter={(value: any) => [`${value.toLocaleString()} kg CO₂e`, 'Emissions']}
+                  formatter={(value: any, name: any, props: any) => [
+                    `${value.toLocaleString()} kg CO₂e`,
+                    props.payload.name
+                  ]}
+                />
+                <Legend 
+                  verticalAlign="bottom"
+                  height={80}
+                  wrapperStyle={{
+                    paddingTop: '20px',
+                    fontSize: '12px'
+                  }}
+                  formatter={(value: any, entry: any) => {
+                    const item = pieChartData[entry.payload?.index || 0];
+                    return item ? `${item.name}` : value;
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -303,48 +355,145 @@ export default function Dashboard() {
           {/* High Impact Strategies */}
           {highImpactRecs.length > 0 && (
             <div className="bg-white/5 border border-red-500/30 rounded-2xl p-6 backdrop-blur">
-              <h3 className="text-2xl font-bold mb-6 text-red-400 flex items-center gap-2">
-                <TrendingUp className="h-6 w-6" />
-                High Impact Optimization Strategies
-              </h3>
-              <div className="space-y-6">
-                {highImpactRecs.map((rec: any, idx: number) => (
-                  <div key={idx} className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h4 className="text-xl font-bold text-white mb-1">{rec.product_name}</h4>
-                        <p className="text-sm text-slate-300">
-                          Current Material: <span className="text-red-400 font-semibold">{rec.current_material}</span>
-                        </p>
-                        <p className="text-sm text-amber-300 mt-1">Issue: {rec.primary_issue}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      {(rec.proposed_strategies || []).map((strategy: any, sIdx: number) => (
-                        <div key={sIdx} className="bg-black/20 rounded-lg p-4 border border-red-500/10">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Target className="h-5 w-5 text-emerald-400" />
-                            <p className="text-emerald-400 font-bold">{strategy.strategy_type}</p>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-red-400 flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6" />
+                  High Impact Optimization Strategies
+                </h3>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-400">Priority:</span>
+                  <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full font-semibold">Critical</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {highImpactRecs.map((rec: any, idx: number) => {
+                  const strategyId = `high-${idx}`;
+                  const isExpanded = expandedStrategies.has(strategyId);
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`bg-red-500/10 border border-red-500/20 rounded-xl overflow-hidden transition-all duration-300 ${
+                        hoveredStrategy === strategyId ? 'shadow-lg shadow-red-500/20 scale-[1.01]' : ''
+                      }`}
+                      onMouseEnter={() => setHoveredStrategy(strategyId)}
+                      onMouseLeave={() => setHoveredStrategy(null)}
+                    >
+                      <div 
+                        className="p-6 cursor-pointer"
+                        onClick={() => toggleStrategy(strategyId)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="text-xl font-bold text-white">{rec.product_name}</h4>
+                              <div className="flex items-center gap-2">
+                                <ArrowRight className="h-4 w-4 text-slate-400" />
+                                <span className="text-sm text-emerald-400 font-semibold">
+                                  {(rec.proposed_strategies || []).length} strategy{(rec.proposed_strategies || []).length !== 1 ? 's' : ''} available
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <p className="text-slate-300">
+                                Current: <span className="text-red-400 font-semibold">{rec.current_material}</span>
+                              </p>
+                              <span className="text-slate-600">•</span>
+                              <p className="text-amber-300 flex items-center gap-1">
+                                <Lightbulb className="h-4 w-4" />
+                                {rec.primary_issue}
+                              </p>
+                            </div>
                           </div>
-                          <div className="space-y-2 mb-3">
-                            <p className="text-xs text-slate-400 uppercase tracking-wide">Action Items:</p>
-                            <ul className="space-y-2">
-                              {(strategy.specific_actions || []).map((action: string, aIdx: number) => (
-                                <li key={aIdx} className="text-sm text-slate-200 pl-4 border-l-2 border-emerald-500/30">
-                                  {action}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded p-3">
-                            <p className="text-xs text-emerald-400 font-semibold mb-1">Expected Outcome:</p>
-                            <p className="text-sm text-white">{strategy.expected_outcome}</p>
-                          </div>
+                          <button 
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleStrategy(strategyId);
+                            }}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-5 w-5 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-slate-400" />
+                            )}
+                          </button>
                         </div>
-                      ))}
+                      </div>
+                      
+                      {isExpanded && (
+                        <div className="px-6 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                          {(rec.proposed_strategies || []).map((strategy: any, sIdx: number) => (
+                            <div 
+                              key={sIdx} 
+                              className="bg-black/30 rounded-lg p-5 border border-red-500/10 hover:border-red-500/30 transition-all"
+                            >
+                              <div className="flex items-start gap-3 mb-4">
+                                <div className="p-2 bg-emerald-500/20 rounded-lg">
+                                  <Target className="h-5 w-5 text-emerald-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-emerald-400 font-bold text-lg mb-1">{strategy.strategy_type}</p>
+                                  <p className="text-sm text-slate-400">Implementation Roadmap</p>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-3 mb-4">
+                                <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Action Checklist:
+                                </p>
+                                <div className="space-y-2">
+                                  {(strategy.specific_actions || []).map((action: string, aIdx: number) => {
+                                    const actionId = `${strategyId}-${sIdx}-${aIdx}`;
+                                    const isCompleted = completedActions.has(actionId);
+                                    
+                                    return (
+                                      <div 
+                                        key={aIdx}
+                                        className={`flex items-start gap-3 p-3 rounded-lg border-l-2 transition-all cursor-pointer group ${
+                                          isCompleted 
+                                            ? 'bg-emerald-500/10 border-emerald-500 hover:bg-emerald-500/15' 
+                                            : 'bg-white/5 border-emerald-500/30 hover:bg-white/10 hover:border-emerald-500/50'
+                                        }`}
+                                        onClick={() => toggleAction(actionId)}
+                                      >
+                                        <div className={`mt-0.5 transition-transform ${isCompleted ? 'scale-110' : ''}`}>
+                                          <CheckCircle2 
+                                            className={`h-5 w-5 transition-colors ${
+                                              isCompleted ? 'text-emerald-400 fill-emerald-400/20' : 'text-slate-500 group-hover:text-emerald-400/50'
+                                            }`}
+                                          />
+                                        </div>
+                                        <p className={`text-sm flex-1 transition-all ${
+                                          isCompleted ? 'text-emerald-200 line-through' : 'text-slate-200'
+                                        }`}>
+                                          {action}
+                                        </p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                              
+                              <div className="bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                  <TrendingDownIcon className="h-5 w-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-xs text-emerald-400 font-semibold mb-2 uppercase tracking-wide">
+                                      Expected Impact
+                                    </p>
+                                    <p className="text-sm text-white leading-relaxed">{strategy.expected_outcome}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -352,44 +501,145 @@ export default function Dashboard() {
           {/* Medium Impact Strategies */}
           {mediumImpactRecs.length > 0 && (
             <div className="bg-white/5 border border-amber-500/30 rounded-2xl p-6 backdrop-blur">
-              <h3 className="text-2xl font-bold mb-6 text-amber-400 flex items-center gap-2">
-                <Target className="h-6 w-6" />
-                Medium Impact Optimization Strategies
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {mediumImpactRecs.map((rec: any, idx: number) => (
-                  <div key={idx} className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6">
-                    <div className="mb-4">
-                      <h4 className="text-lg font-bold text-white mb-1">{rec.product_name}</h4>
-                      <p className="text-sm text-slate-300">
-                        Current Material: <span className="text-amber-400 font-semibold">{rec.current_material}</span>
-                      </p>
-                      <p className="text-sm text-amber-300 mt-1">Issue: {rec.primary_issue}</p>
-                    </div>
-                    <div className="space-y-4">
-                      {(rec.proposed_strategies || []).map((strategy: any, sIdx: number) => (
-                        <div key={sIdx} className="bg-black/20 rounded-lg p-4 border border-amber-500/10">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Zap className="h-4 w-4 text-emerald-400" />
-                            <p className="text-emerald-400 font-bold text-sm">{strategy.strategy_type}</p>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-amber-400 flex items-center gap-2">
+                  <Target className="h-6 w-6" />
+                  Medium Impact Optimization Strategies
+                </h3>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-400">Priority:</span>
+                  <span className="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full font-semibold">Moderate</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {mediumImpactRecs.map((rec: any, idx: number) => {
+                  const strategyId = `medium-${idx}`;
+                  const isExpanded = expandedStrategies.has(strategyId);
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`bg-amber-500/10 border border-amber-500/20 rounded-xl overflow-hidden transition-all duration-300 ${
+                        hoveredStrategy === strategyId ? 'shadow-lg shadow-amber-500/20 scale-[1.01]' : ''
+                      }`}
+                      onMouseEnter={() => setHoveredStrategy(strategyId)}
+                      onMouseLeave={() => setHoveredStrategy(null)}
+                    >
+                      <div 
+                        className="p-6 cursor-pointer"
+                        onClick={() => toggleStrategy(strategyId)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="text-xl font-bold text-white">{rec.product_name}</h4>
+                              <div className="flex items-center gap-2">
+                                <ArrowRight className="h-4 w-4 text-slate-400" />
+                                <span className="text-sm text-emerald-400 font-semibold">
+                                  {(rec.proposed_strategies || []).length} strategy{(rec.proposed_strategies || []).length !== 1 ? 's' : ''} available
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <p className="text-slate-300">
+                                Current: <span className="text-amber-400 font-semibold">{rec.current_material}</span>
+                              </p>
+                              <span className="text-slate-600">•</span>
+                              <p className="text-amber-300 flex items-center gap-1">
+                                <Lightbulb className="h-4 w-4" />
+                                {rec.primary_issue}
+                              </p>
+                            </div>
                           </div>
-                          <div className="space-y-2 mb-2">
-                            <ul className="space-y-1">
-                              {(strategy.specific_actions || []).map((action: string, aIdx: number) => (
-                                <li key={aIdx} className="text-xs text-slate-300 pl-3 border-l border-emerald-500/30">
-                                  {action}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded p-2 mt-2">
-                            <p className="text-xs text-white">{strategy.expected_outcome}</p>
-                          </div>
+                          <button 
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleStrategy(strategyId);
+                            }}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-5 w-5 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-slate-400" />
+                            )}
+                          </button>
                         </div>
-                      ))}
+                      </div>
+                      
+                      {isExpanded && (
+                        <div className="px-6 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                          {(rec.proposed_strategies || []).map((strategy: any, sIdx: number) => (
+                            <div 
+                              key={sIdx} 
+                              className="bg-black/30 rounded-lg p-5 border border-amber-500/10 hover:border-amber-500/30 transition-all"
+                            >
+                              <div className="flex items-start gap-3 mb-4">
+                                <div className="p-2 bg-emerald-500/20 rounded-lg">
+                                  <Zap className="h-5 w-5 text-emerald-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-emerald-400 font-bold text-lg mb-1">{strategy.strategy_type}</p>
+                                  <p className="text-sm text-slate-400">Implementation Roadmap</p>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-3 mb-4">
+                                <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Action Checklist:
+                                </p>
+                                <div className="space-y-2">
+                                  {(strategy.specific_actions || []).map((action: string, aIdx: number) => {
+                                    const actionId = `${strategyId}-${sIdx}-${aIdx}`;
+                                    const isCompleted = completedActions.has(actionId);
+                                    
+                                    return (
+                                      <div 
+                                        key={aIdx}
+                                        className={`flex items-start gap-3 p-3 rounded-lg border-l-2 transition-all cursor-pointer group ${
+                                          isCompleted 
+                                            ? 'bg-emerald-500/10 border-emerald-500 hover:bg-emerald-500/15' 
+                                            : 'bg-white/5 border-emerald-500/30 hover:bg-white/10 hover:border-emerald-500/50'
+                                        }`}
+                                        onClick={() => toggleAction(actionId)}
+                                      >
+                                        <div className={`mt-0.5 transition-transform ${isCompleted ? 'scale-110' : ''}`}>
+                                          <CheckCircle2 
+                                            className={`h-5 w-5 transition-colors ${
+                                              isCompleted ? 'text-emerald-400 fill-emerald-400/20' : 'text-slate-500 group-hover:text-emerald-400/50'
+                                            }`}
+                                          />
+                                        </div>
+                                        <p className={`text-sm flex-1 transition-all ${
+                                          isCompleted ? 'text-emerald-200 line-through' : 'text-slate-200'
+                                        }`}>
+                                          {action}
+                                        </p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                              
+                              <div className="bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                  <TrendingDownIcon className="h-5 w-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-xs text-emerald-400 font-semibold mb-2 uppercase tracking-wide">
+                                      Expected Impact
+                                    </p>
+                                    <p className="text-sm text-white leading-relaxed">{strategy.expected_outcome}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

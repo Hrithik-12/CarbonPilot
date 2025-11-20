@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, useRef, type ChangeEvent, type FormEvent } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -10,6 +10,9 @@ import {
   LineChart,
   Loader2,
   Sparkles,
+  Upload,
+  FileText,
+  X,
 } from 'lucide-react';
 
 type FormState = {
@@ -36,8 +39,7 @@ type ApiResponse =
   | { ok: false; error: string };
 
 const DEFAULT_FORM: FormState = {
-  scenario: `The recent product carbon footprint analysis reveals a critical need for focused sustainability intervention, particularly given the Steel Frame component accounts for over two-thirds ($68.4\%$) of the total calculated emissions. While this data successfully pinpoints high-impact material types like Steel, the failure to process an item due to the absence of 'Vibranium' in the database underscores a major operational gap. Immediate priority must be placed on both sourcing lower-carbon alternatives for the dominant steel material and ensuring comprehensive emission factor coverage for all materials used, thereby guaranteeing the integrity and completeness of the final environmental inventory.
-`,
+  scenario: `Our manufacturing operation produces diverse products across multiple material categories, including metals, plastics, textiles, and natural materials. The recent carbon footprint analysis of 24 product lines reveals significant emission variations, with high-carbon materials like steel, aluminum, and leather dominating our environmental impact. We need to identify the highest-emission products and develop targeted decarbonization strategies while maintaining product quality and operational efficiency. This analysis will guide our sustainability roadmap and help prioritize interventions across our supply chain.`,
   dataSnapshot: `{
   "summary": {
     "totalProducts": 4,
@@ -86,7 +88,7 @@ const DEFAULT_FORM: FormState = {
     }
   ]
 }`,
-  goal: `Analyze the following sustainability targets for a manufacturing operation and outline the three most critical strategic initiatives required to achieve them. The primary goal is to significantly reduce the carbon intensity of goods and eliminate data calculation errors. Targets include: 1) A 15% reduction in the emission factor for Steel (from $1.85$ to $\le 1.57 \text{ kg } \text{CO}_2\text{e}$/kg), which is the largest contributor ($68.4\%$); 2) Achieving a $100\%$ successful calculation rate by integrating all missing material emission factors; and 3) Piloting sustainable sourcing to reduce Cotton T-Shirt emissions by $5\%$ (from $1,060$ to $\le 1,007 \text{ kg } \text{CO}_2\text{e}$). The output should be a prioritized list of three initiatives with brief justifications.`,
+  goal: `Achieve a 25% reduction in total carbon emissions across our product portfolio by Q4 2026. Primary objectives include: 1) Eliminate all high-impact products through material substitution or process optimization, targeting a shift from conventional materials to low-carbon alternatives; 2) Reduce medium-impact products by 40% through supplier engagement and circular economy practices; 3) Implement comprehensive lifecycle assessments for all new product developments; 4) Establish supplier scorecards with carbon performance metrics to drive accountability across the value chain.`,
   urgency: 'quarter',
 };
 
@@ -155,14 +157,9 @@ export default function Home() {
   const [result, setResult] = useState<AgentSuccessPayload | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [tickerMessage, setTickerMessage] = useState(TICKER_MESSAGES[0]);
-  const [showDashboardModal, setShowDashboardModal] = useState(false);
-
-  useEffect(() => {
-    // Show modal when results are available
-    if (result && !loading) {
-      setShowDashboardModal(true);
-    }
-  }, [result, loading]);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading) {
@@ -182,6 +179,57 @@ export default function Home() {
   const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      setError('Please upload a CSV file');
+      return;
+    }
+
+    setUploadedFile(file);
+    setUploadingCsv(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload-csv', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!result.ok) {
+        throw new Error(result.error || 'Failed to process CSV');
+      }
+
+      // Update the dataSnapshot field with calculated data
+      setFormData((prev) => ({
+        ...prev,
+        dataSnapshot: result.data.dataSnapshot,
+      }));
+
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload CSV');
+      setUploadedFile(null);
+    } finally {
+      setUploadingCsv(false);
+    }
+  };
+
+  const clearUploadedFile = () => {
+    setUploadedFile(null);
+    setFormData((prev) => ({ ...prev, dataSnapshot: '' }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const runCarbonPilot = async (event: FormEvent<HTMLFormElement>) => {
@@ -221,7 +269,6 @@ export default function Home() {
 
   const openDashboard = () => {
     window.open('/dashboard', '_blank');
-    setShowDashboardModal(false);
   };
 
   const copyToClipboard = async (text: string, section: string) => {
@@ -382,8 +429,8 @@ export default function Home() {
               </div>
             </div>
 
-            <form className="space-y-5" onSubmit={runCarbonPilot}>
-              <label className="block space-y-2">
+            <form className="space-y-6" onSubmit={runCarbonPilot}>
+              <label className="block space-y-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
                   Scenario Overview *
                 </span>
@@ -393,25 +440,63 @@ export default function Home() {
                   onChange={handleInputChange}
                   placeholder="Describe the plant, production line, or business objective driving this analysis."
                   rows={4}
-                  className="w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm leading-relaxed text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 />
               </label>
 
-              <label className="block space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
-                  Data Snapshot *
-                </span>
+              <label className="block space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
+                    Data Snapshot *
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+                  >
+                    <Upload className="h-3 w-3" />
+                    Upload CSV
+                  </button>
+                </div>
+                
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+
+                {uploadedFile && (
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 mb-2">
+                    <FileText className="h-4 w-4 text-emerald-400" />
+                    <span className="flex-1 text-sm text-emerald-200">{uploadedFile.name}</span>
+                    {uploadingCsv ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={clearUploadedFile}
+                        className="rounded-lg p-1 hover:bg-white/10 transition"
+                      >
+                        <X className="h-4 w-4 text-emerald-400" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <textarea
                   name="dataSnapshot"
                   value={formData.dataSnapshot}
                   onChange={handleInputChange}
-                  placeholder="List the pre-calculated emission values, product names, material mixes, and supporting metrics."
+                  placeholder="List the pre-calculated emission values, product names, material mixes, and supporting metrics. Or upload a CSV file above."
                   rows={6}
-                  className="w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm leading-relaxed text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  disabled={uploadingCsv}
                 />
               </label>
 
-              <label className="block space-y-2">
+              <label className="block space-y-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
                   Sustainability Goal
                 </span>
@@ -421,11 +506,11 @@ export default function Home() {
                   onChange={handleInputChange}
                   placeholder="e.g., Cut Category 3 emissions by 15% in FY26, prioritize recycled aluminum, etc."
                   rows={3}
-                  className="w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm leading-relaxed text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 />
               </label>
 
-              <label className="block space-y-2">
+              <label className="block space-y-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
                   Urgency
                 </span>
@@ -433,7 +518,7 @@ export default function Home() {
                   name="urgency"
                   value={formData.urgency}
                   onChange={handleInputChange}
-                  className="w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-white focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  className="w-full rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-white focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 >
                   <option value="immediate" className="bg-slate-900 text-white">
                     Immediate Hotfix
@@ -488,16 +573,27 @@ export default function Home() {
         <main className="flex-1 space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm uppercase tracking-[0.3em] text-emerald-200">Agent Control</p>
                 <h2 className="text-3xl font-semibold text-white">Real-time Orchestration</h2>
                 <p className="mt-2 text-sm text-white/70">
                   Analyzer ➜ Optimizer ➜ Loop agent flow mirrored from the LinkedIn reference implementation.
                 </p>
               </div>
-              <div className="rounded-2xl bg-white/10 px-5 py-3 text-right text-white">
-                <p className="text-xs uppercase tracking-[0.4em] text-white/60">Session</p>
-                <p className="text-lg font-semibold">{String(result?.metadata?.sessionId ?? '—')}</p>
+              <div className="flex items-center gap-4">
+                {result && !loading && (
+                  <button
+                    onClick={openDashboard}
+                    className="flex items-center gap-2 rounded-2xl bg-emerald-400 px-6 py-3 text-base font-semibold text-slate-900 transition hover:bg-emerald-300 shadow-lg shadow-emerald-400/20"
+                  >
+                    <Sparkles className="h-5 w-5" />
+                    View Dashboard
+                  </button>
+                )}
+                <div className="rounded-2xl bg-white/10 px-5 py-3 text-right text-white">
+                  <p className="text-xs uppercase tracking-[0.4em] text-white/60">Session</p>
+                  <p className="text-lg font-semibold">{String(result?.metadata?.sessionId ?? '—')}</p>
+                </div>
               </div>
             </div>
 
@@ -596,37 +692,6 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Dashboard Modal */}
-      {showDashboardModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-emerald-400/30 rounded-3xl p-8 max-w-md w-full shadow-2xl">
-            <div className="text-center">
-              <div className="mx-auto mb-4 w-16 h-16 bg-emerald-400/20 rounded-full flex items-center justify-center">
-                <Sparkles className="h-8 w-8 text-emerald-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Analysis Complete!</h3>
-              <p className="text-slate-300 mb-6">
-                Your carbon footprint analysis is ready. Would you like to view the interactive dashboard?
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDashboardModal(false)}
-                  className="flex-1 px-6 py-3 rounded-xl border border-slate-600 text-slate-300 font-semibold hover:bg-slate-700 transition"
-                >
-                  View Here
-                </button>
-                <button
-                  onClick={openDashboard}
-                  className="flex-1 px-6 py-3 rounded-xl bg-emerald-400 text-slate-900 font-semibold hover:bg-emerald-300 transition flex items-center justify-center gap-2"
-                >
-                  <Sparkles className="h-5 w-5" />
-                  Open Dashboard
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

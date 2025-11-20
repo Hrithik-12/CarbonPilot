@@ -1,4 +1,4 @@
-import emissionData from "../data/emission-factor.json";
+import emissionDataImport from "../data/emission-factor.json";
 import type {
   EmissionDatabase,
   ProductData,
@@ -6,7 +6,8 @@ import type {
   BatchCalculationResult,
 } from "../../types/carbon";
 
-// Type assertion for imported JSON
+// Type assertion for imported JSON - handle both default and direct imports
+const emissionData = (emissionDataImport as any).default || emissionDataImport;
 const typedEmissionData = emissionData as EmissionDatabase;
 
 /**

@@ -99,6 +99,41 @@
       "co2_per_kg": 2.9,
       "unit": "kg CO2e per kg",
       "description": "Bronze alloy production"
+    },
+    "Bamboo": {
+      "co2_per_kg": 0.5,
+      "unit": "kg CO2e per kg",
+      "description": "Bamboo harvesting and processing"
+    },
+    "Silicon": {
+      "co2_per_kg": 11.0,
+      "unit": "kg CO2e per kg",
+      "description": "Silicon wafer production"
+    },
+    "Brass": {
+      "co2_per_kg": 2.7,
+      "unit": "kg CO2e per kg",
+      "description": "Brass alloy production"
+    },
+    "Wool": {
+      "co2_per_kg": 6.4,
+      "unit": "kg CO2e per kg",
+      "description": "Wool fiber production"
+    },
+    "Acrylic": {
+      "co2_per_kg": 5.8,
+      "unit": "kg CO2e per kg",
+      "description": "Acrylic polymer production"
+    },
+    "Marble": {
+      "co2_per_kg": 0.45,
+      "unit": "kg CO2e per kg",
+      "description": "Marble extraction and processing"
+    },
+    "Jute": {
+      "co2_per_kg": 1.2,
+      "unit": "kg CO2e per kg",
+      "description": "Jute fiber production"
     }
   },
   "transportation": {
